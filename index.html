@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07120d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Hadith Adventure — Three.js Prototype</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none} 
+body{margin:0;overflow:hidden;background:#07120d;font-family:Inter,system-ui,Arial;color:#fff;touch-action:none}
+#game{position:fixed;inset:0}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none;z-index:5}
+.card{background:rgba(5,18,13,.85);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px);border-radius:16px;padding:10px 14px;box-shadow:0 10px 30px #0004}
+.title{font-weight:800;font-size:16px}.sub{font-size:11px;color:#b9c8bf;margin-top:2px}
+.xp{width:140px;height:8px;background:#26352d;border-radius:99px;margin-top:6px;overflow:hidden}.xp>i{display:block;height:100%;width:28%;background:#d8b45a}
+#prompt{position:fixed;bottom:180px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(5,18,13,.9);padding:10px 16px;border-radius:14px;border:1px solid #ffffff22;display:none;font-size:14px;text-align:center}
+kbd{background:#fff;color:#111;padding:2px 6px;border-radius:5px;font-weight:800}
+#quest{position:fixed;top:80px;left:12px;z-index:5;max-width:240px;pointer-events:none}
+#quest b{font-size:11px;color:#d8b45a}.questtext{font-size:13px;margin-top:4px;line-height:1.3}
+#modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.panel{width:min(620px,100%);max-height:90vh;overflow-y:auto;background:#102018;border:1px solid #ffffff20;border-radius:20px;padding:20px;box-shadow:0 25px 80px #0008}
+.badge{display:inline-block;background:#d8b45a;color:#17140a;font-weight:800;padding:4px 8px;border-radius:999px;font-size:10px;margin-bottom:8px}
+h1{font-size:22px;margin:4px 0 8px}.arabic{font-family:serif;font-size:20px;line-height:1.6;text-align:right;background:#09150f;padding:12px;border-radius:12px;margin:12px 0}
+.meaning{color:#d7e1db;line-height:1.45;font-size:14px}.choices{display:grid;gap:8px;margin-top:14px}.choice{border:1px solid #ffffff1c;background:#172a20;color:white;text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font-size:13px}.choice:hover{background:#21392b;border-color:#d8b45a}.choice:disabled{opacity:.7;cursor:default}
+#toast{position:fixed;top:80px;right:12px;z-index:30;background:#d8b45a;color:#17140a;padding:8px 12px;border-radius:10px;font-weight:800;font-size:13px;display:none}
+#controls-hint{position:fixed;bottom:12px;left:12px;z-index:5;color:#d0ddd5;font-size:11px;background:#07140eaa;padding:8px 10px;border-radius:10px}
+#minimap{position:fixed;top:80px;right:12px;width:90px;height:90px;border-radius:14px;background:#07140edd;border:1px solid #ffffff18;z-index:5;overflow:hidden;pointer-events:none}
+.dot{position:absolute;width:6px;height:6px;border-radius:50%;background:#d8b45a;transform:translate(-50%,-50%)}
+.npcdot{position:absolute;width:5px;height:5px;border-radius:50%;background:#65c7ff;transform:translate(-50%,-50%)}
+
+/* Mobile Touch Controls */
+#touch-controls{position:fixed;inset:0;pointer-events:none;z-index:10;display:none}
+#joystick-zone{position:absolute;bottom:20px;left:20px;width:120px;height:120px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.15);border-radius:50%;pointer-events:auto;touch-action:none}
+#joystick-knob{position:absolute;top:50%;left:50%;width:50px;height:50px;background:rgba(216,180,90,.6);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+#action-btn{position:absolute;bottom:35px;right:25px;width:70px;height:70px;background:rgba(216,180,90,.8);color:#102018;font-weight:900;font-size:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px #0006;pointer-events:auto;border:none;outline:none}
+#action-btn:active{transform:scale(.92);background:#d8b45a}
+
+/* Install PWA Banner */
+#install-btn{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:100;background:#d8b45a;color:#102018;font-weight:800;padding:8px 16px;border-radius:20px;border:none;box-shadow:0 4px 15px #0006;display:none;font-size:12px;cursor:pointer}
+
+@media(hover:none),(max-width:768px){
+ #touch-controls{display:block}
+ #controls-hint{display:none}
+ #prompt{bottom:160px}
+}
+</style>
+</head>
+<body>
+<button id="install-btn">📱 Install App</button>
+<div id="game"></div>
+<div id="hud">
+  <div class="card"><div class="title">⚔️ Hadith Adventure</div><div class="sub">Journey of Akhlak • Prototype</div></div>
+  <div class="card"><div><b id="level">Level 1</b> · <span id="xpText">140 / 500 XP</span></div><div class="xp"><i id="xpbar"></i></div></div>
+</div>
+<div id="quest" class="card"><b>ACTIVE QUEST</b><div class="questtext" id="questText">Cari Ustaz Hamid di kawasan pasar.</div></div>
+<div id="prompt">Tekan <kbd>E</kbd> atau butang <kbd>ACTION</kbd></div>
+<div id="controls-hint">W A S D / Arrow Keys · E = Interact</div>
+<div id="minimap"><div class="dot" id="playerDot"></div><div class="npcdot" style="left:72%;top:38%"></div><div class="npcdot" style="left:27%;top:68%"></div></div>
+<div id="toast"></div>
+
+<div id="touch-controls">
+  <div id="joystick-zone"><div id="joystick-knob"></div></div>
+  <button id="action-btn">E</button>
+</div>
+
+<div id="modal">
+ <div class="panel">
+   <span class="badge" id="modalBadge">QUEST</span>
+   <h1 id="modalTitle">Jaga Lisan</h1>
+   <div id="modalBody"></div>
+   <div class="choices" id="choices"></div>
+ </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'block';
+});
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') installBtn.style.display = 'none';
+    deferredPrompt = null;
+  }
+});
+
+// Three.js Game Setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8db5a0);
+scene.fog = new THREE.Fog(0x8db5a0, 28, 75);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 150);
+camera.position.set(0, 8, 12);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('game').appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xe9fff4, 0x304538, 2.2));
+const sun = new THREE.DirectionalLight(0xfff2cc, 2.5);
+sun.position.set(-15, 25, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+
+const mat = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), mat(0x587c62));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+function box(x, y, z, sx, sy, sz, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+function tree(x, z) {
+  box(x, 1, z, 0.45, 2, 0.45, 0x704c32);
+  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 1), mat(0x244d35));
+  crown.position.set(x, 3, z);
+  crown.castShadow = true;
+  scene.add(crown);
+}
+
+for (let x = -38; x <= 38; x += 8) { tree(x, -35); tree(x, 35); }
+for (let z = -27; z <= 27; z += 9) { tree(-38, z); tree(38, z); }
+
+function building(x, z, w, d, h, color, label) {
+  box(x, h / 2, z, w, h, d, color);
+  box(x, h + 0.25, z, w + 0.7, 0.5, d + 0.7, 0x4b3425);
+  if (label) {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#102018';
+    if (ctx.roundRect) ctx.roundRect(8, 8, 496, 80, 20);
+    else ctx.rect(8, 8, 496, 80);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 34px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, 256, 58);
+    
+    const tex = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    sp.scale.set(7, 1.3, 1);
+    sp.position.set(x, h + 2, z);
+    scene.add(sp);
+  }
+}
+
+building(-15, -8, 11, 8, 5, 0xb58a62, 'MASJID');
+building(17, -7, 13, 9, 5, 0xa87a4e, 'PASAR');
+building(0, 19, 15, 8, 4.5, 0x7e9f7c, 'RUMAH ILMU');
+
+for (let i = 0; i < 16; i++) {
+  const x = (Math.random() - 0.5) * 55, z = (Math.random() - 0.5) * 45;
+  if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
+  const b = box(x, 0.25, z, 1, 0.5, 1, 0x806044);
+  b.rotation.y = Math.random() * Math.PI;
+}
+
+function character(color = 0x2e5d48) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 1.15, 16), mat(color));
+  body.position.y = 1.2;
+  body.castShadow = true;
+  g.add(body);
+  
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 12), mat(0xc98f68));
+  head.position.y = 2.25;
+  head.castShadow = true;
+  g.add(head);
+  
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.18, 16), mat(0xf0eee4));
+  cap.position.y = 2.58;
+  g.add(cap);
+  
+  return g;
+}
+
+const player = character(0x244f42);
+player.position.set(0, 0, 9);
+scene.add(player);
+
+function npc(x, z, color, name) {
+  const n = character(color);
+  n.position.set(x, 0, z);
+  scene.add(n);
+  n.userData.name = name;
+  return n;
+}
+
+const ustaz = npc(13, 0, 0x315c7b, 'Ustaz Hamid');
+const merchant = npc(21, -10, 0x7c4b38, 'Pak Karim');
+const student = npc(-8, 15, 0x6a4b78, 'Amin');
+
+let xp = 140, level = 1, quest = 0, activeNpc = null;
+const keys = {};
+let touchMove = { x: 0, y: 0 };
+
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'e') interact();
+});
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+const joystickZone = document.getElementById('joystick-zone');
+const joystickKnob = document.getElementById('joystick-knob');
+let joystickActive = false;
+let joystickCenter = { x: 0, y: 0 };
+
+joystickZone.addEventListener('touchstart', e => {
+  joystickActive = true;
+  const rect = joystickZone.getBoundingClientRect();
+  joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  updateJoystick(e.touches[0]);
+});
+
+window.addEventListener('touchmove', e => {
+  if (!joystickActive) return;
+  updateJoystick(e.touches[0]);
+});
+
+window.addEventListener('touchend', e => {
+  if (!joystickActive) return;
+  joystickActive = false;
+  touchMove = { x: 0, y: 0 };
+  joystickKnob.style.transform = `translate(-50%, -50%)`;
+});
+
+function updateJoystick(touch) {
+  const dx = touch.clientX - joystickCenter.x;
+  const dy = touch.clientY - joystickCenter.y;
+  const dist = Math.hypot(dx, dy);
+  const maxRadius = 35;
+  const angle = Math.atan2(dy, dx);
+  const clampDist = Math.min(dist, maxRadius);
+  
+  const moveX = Math.cos(angle) * clampDist;
+  const moveY = Math.sin(angle) * clampDist;
+  
+  joystickKnob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+  touchMove = { x: moveX / maxRadius, y: moveY / maxRadius };
+}
+
+document.getElementById('action-btn').addEventListener('click', interact);
+
+const questData = [
+  {title:'Jaga Lisan', npc:'Ustaz Hamid', prompt:'Di pasar, kamu terdengar dua orang sedang mengumpat tentang seorang kenalan. Apa tindakan paling tepat?', hadith:'إِنَّ مِنْ أَحَبِّكُمْ إِلَيَّ وَأَقْرَبِكُمْ مِنِّي مَجْلِسًا يَوْمَ الْقِيَامَةِ أَحَاسِنَكُمْ أَخْلَاقًا', meaning:'Antara orang yang paling dekat dengan Rasulullah ﷺ pada hari kiamat ialah mereka yang paling baik akhlaknya.', choices:['Sertai perbualan supaya tidak dianggap pelik.','Tinggalkan perbualan dan cuba menegur dengan cara yang baik.','Sebarkan cerita itu kepada orang lain.'],correct:1},
+  {title:'Amanah', npc:'Pak Karim', prompt:'Pak Karim tersalah memberi kamu wang lebih ketika membeli sesuatu. Apa yang kamu lakukan?', hadith:'أَدِّ الْأَمَانَةَ إِلَى مَنِ ائْتَمَنَكَ', meaning:'Tunaikanlah amanah kepada orang yang memberikan amanah kepadamu.', choices:['Simpan wang itu kerana tiada siapa perasan.','Pulangkan wang yang terlebih dan beritahu kesilapan tersebut.','Ambil sebahagian dan pulangkan selebihnya.'],correct:1},
+  {title:'Membantu Orang', npc:'Amin', prompt:'Amin kelihatan kesukaran membawa beberapa barang. Kamu sedang menuju ke rumah. Apa pilihan terbaik?', hadith:'وَاللَّهُ فِي عَوْنِ الْعَبْدِ مَا كَانَ الْعَبْدُ فِي عَوْنِ أَخِيهِ', meaning:'Allah sentiasa membantu seorang hamba selama hamba itu membantu saudaranya.', choices:['Berpura-pura tidak nampak.','Membantu setakat yang mampu tanpa mengabaikan tanggungjawab sendiri.','Suruh orang lain membantu walaupun kamu boleh membantu.'],correct:1}
+];
+
+function showQuest(q) {
+  const data = questData[q];
+  document.getElementById('modalBadge').textContent = 'QUEST ' + (q + 1);
+  document.getElementById('modalTitle').textContent = data.title;
+  document.getElementById('modalBody').innerHTML = '<p>' + data.prompt + '</p>';
+  const choices = document.getElementById('choices');
+  choices.innerHTML = '';
+  data.choices.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = String.fromCharCode(65 + i) + '. ' + c;
+    b.onclick = () => answer(i);
+    choices.appendChild(b);
+  });
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function answer(i) {
+  const data = questData[quest];
+  const buttons = [...document.querySelectorAll('.choice')];
+  buttons.forEach(b => b.disabled = true);
+  const correct = i === data.correct;
+  const body = document.getElementById('modalBody');
+  
+  if (correct) {
+    xp += 120;
+    while (xp >= 500) { xp -= 500; level++; }
+    document.getElementById('modalBadge').textContent = '✓ QUEST COMPLETE';
+    document.getElementById('modalTitle').textContent = 'Pilihan yang baik!';
+    body.innerHTML = '<div class="arabic">' + data.hadith + '</div><p class="meaning"><b>Pengajaran:</b> ' + data.meaning + '</p><p style="color:#d8b45a;font-weight:800">+120 XP · Akhlak meningkat</p>';
+    quest++;
+    if (quest < questData.length) {
+      document.getElementById('questText').textContent = 'Cari ' + questData[quest].npc + ' untuk quest seterusnya.';
+    } else {
+      document.getElementById('questText').textContent = 'Semua quest prototype selesai! 🎉';
+    }
+    buttons.forEach((b, j) => { if (j === i) b.style.outline = '2px solid #d8b45a'; });
+  } else {
+    document.getElementById('modalBadge').textContent = 'CUBA LAGI';
+    document.getElementById('modalTitle').textContent = 'Belum tepat';
+    body.innerHTML = '<p class="meaning">Fikirkan semula pilihan yang paling selari dengan pengajaran hadis.</p><p style="color:#ffcf8a">Kamu boleh cuba semula.</p>';
+    buttons.forEach((b, j) => { if (j === i) b.style.opacity = '.5'; });
+    const retry = document.createElement('button');
+    retry.className = 'choice';
+    retry.textContent = '↻ Cuba semula';
+    retry.onclick = () => showQuest(quest);
+    document.getElementById('choices').appendChild(retry);
+  }
+  updateHud();
+  if (correct) setTimeout(() => document.getElementById('modal').style.display = 'none', 1800);
+}
+
+function interact() {
+  if (!activeNpc) return;
+  if (quest >= questData.length) { toast('Semua quest demo telah selesai!'); return; }
+  if (activeNpc.userData.name === questData[quest].npc) showQuest(quest);
+  else toast('NPC ini bukan sasaran quest semasa.');
+}
+
+function toast(t) {
+  const el = document.getElementById('toast');
+  el.textContent = t;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 1500);
+}
+
+function updateHud() {
+  document.getElementById('xpText').textContent = xp + ' / 500 XP';
+  document.getElementById('level').textContent = 'Level ' + level;
+  document.getElementById('xpbar').style.width = (xp / 500 * 100) + '%';
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  let dx = touchMove.x, dz = touchMove.y;
+  
+  if (keys.w || keys.arrowup) dz -= 1;
+  if (keys.s || keys.arrowdown) dz += 1;
+  if (keys.a || keys.arrowleft) dx -= 1;
+  if (keys.d || keys.arrowright) dx += 1;
+  
+  if (dx || dz) {
+    const l = Math.hypot(dx, dz);
+    if (l > 1) { dx /= l; dz /= l; }
+    player.position.x += dx * dt * 6;
+    player.position.z += dz * dt * 6;
+    player.rotation.y = Math.atan2(dx, dz);
+  }
+  
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -33, 33);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -30, 30);
+  
+  camera.position.lerp(new THREE.Vector3(player.position.x, player.position.y + 7.5, player.position.z + 10), 0.08);
+  camera.lookAt(player.position.x, 1.2, player.position.z);
+  
+  const npcs = [ustaz, merchant, student];
+  activeNpc = null;
+  let nearest = 99;
+  npcs.forEach(n => {
+    const d = player.position.distanceTo(n.position);
+    if (d < 3 && d < nearest) { nearest = d; activeNpc = n; }
+  });
+  
+  document.getElementById('prompt').style.display = activeNpc ? 'block' : 'none';
+  const pd = document.getElementById('playerDot');
+  pd.style.left = (50 + player.position.x / 70 * 100) + '%';
+  pd.style.top = (50 + player.position.z / 70 * 100) + '%';
+  
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+updateHud();
+animate();
+</script>
+</body>
+</html>
