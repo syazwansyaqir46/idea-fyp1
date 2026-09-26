@@ -1,0 +1,15 @@
+{
+  "name": "Hadith Adventure",
+  "short_name": "Hadith Game",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07120d",
+  "theme_color": "#07120d",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
