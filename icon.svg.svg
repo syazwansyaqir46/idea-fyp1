@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#07120d"/>
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#d8b45a" stroke-width="16"/>
+  <text x="256" y="280" font-size="200" text-anchor="middle" dominant-baseline="middle">⚔️</text>
+</svg>
